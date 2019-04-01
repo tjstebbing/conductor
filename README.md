@@ -8,9 +8,9 @@ starting up dependant services and shutting them down gracefully.
 A service implements the conductor.Service interface via a Run 
 method which takes 3 channels:
 
-***started chan bool*** - Send true when your service is running
-***stopped chan bool*** - Send true when your service has stopped 
-***stop chan context.Context*** - Select on this to be notified of shutdown, context with timeout.
+* ***started chan bool*** - Send true when your service is running
+* ***stopped chan bool*** - Send true when your service has stopped 
+* ***stop chan context.Context*** - Select on this to be notified of shutdown, context with timeout.
 
 ```go
 
