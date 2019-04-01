@@ -27,7 +27,8 @@ func (t MyService) Run(started, stopped chan bool, stop chan context.Context) {
     }
   }()
 
-}```
+}
+```
 
 
 ## Starting your services:
