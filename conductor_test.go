@@ -30,14 +30,12 @@ type testService struct {
 func (t *testService) Run(started, stopped chan bool, stop chan context.Context) error {
 	go func() {
 		started <- true
-		t.test.Log("start")
 		t.flags.started = true
 		t.flags.startTime = time.Now()
 		select {
 		case <-stop:
-			t.test.Log("stopping because signalled ")
 			t.flags.stopped = true
-			stopped <- true
+			close(stopped)
 		}
 	}()
 	return nil
@@ -64,8 +62,8 @@ func TestOrderedStartup(t *testing.T) {
 	s2 := testService{&f2, t}
 
 	c := New(Noisy())
-	c.Service("test service", &s1)
-	c.Service("test service 2", &s2)
+	c.Service("s1", &s1)
+	c.Service("s2", &s2)
 	stopped := c.Start()
 	c.Stop()
 	<-stopped

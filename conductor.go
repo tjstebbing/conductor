@@ -93,7 +93,7 @@ SRV_LOOP:
 // stop the conductor, begin shutting down services
 func (c *conductor) Stop() {
 	// signal all services they should shutdown within timeout seconds
-	ctx, cancel := context.WithTimeout(context.Background(), c.stopTimeout)
+	ctx, _ := context.WithTimeout(context.Background(), c.stopTimeout)
 
 	wg := sync.WaitGroup{}
 	// we're waiting for this many services to close..
@@ -103,7 +103,7 @@ func (c *conductor) Stop() {
 	done := make(chan bool)
 	go func() {
 		wg.Wait()
-		close(done)
+		done <- true
 	}()
 
 	// decrement our waitgroup when each service says it has stopped
@@ -119,10 +119,13 @@ func (c *conductor) Stop() {
 	select {
 	case <-done:
 		close(c.shutdown)
-	case <-time.After(c.stopTimeout):
-		c.log("Timeout exeeded waiting for services to stop, shutting down")
-		cancel()
-		close(c.shutdown)
+		return
+		/*
+			case <-time.After(c.stopTimeout + time.Second):
+				c.log("Timeout exeeded waiting for services to stop, shutting down")
+				cancel()
+				close(c.shutdown)
+				return*/
 	}
 }
 
