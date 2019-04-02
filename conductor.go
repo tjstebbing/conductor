@@ -30,7 +30,7 @@ type conductor struct {
 	startTimeout time.Duration // How long should we wait for each service to start before we die?
 	stopTimeout  time.Duration // How long should we wait for each service to stop before we kill it?
 	shutdown     chan bool     // channel to block on, indicates everything has stopped, returned from Start()
-	services     []serviceState
+	services     []*serviceState
 }
 
 /* Create a new conductor instance, accepts Option funcs (see README.md)
@@ -42,7 +42,7 @@ func New(opts ...func(*conductor)) *conductor {
 		startTimeout: startupTimeout,
 		stopTimeout:  shutdownTimeout,
 		shutdown:     make(chan bool),
-		services:     []serviceState{},
+		services:     []*serviceState{},
 	}
 
 	for _, optFn := range opts {
@@ -57,7 +57,7 @@ func (c *conductor) Service(name string, service Service) {
 		panic("Cannot call Conductor.Service after Conductor.Start")
 	}
 	c.services = append(c.services,
-		serviceState{name, service, make(chan bool), make(chan bool), make(chan context.Context)})
+		&serviceState{name, service, make(chan bool, 1), make(chan bool, 1), make(chan context.Context, 1)})
 }
 
 /* Start the conductor, each service is started in turn */
@@ -65,6 +65,7 @@ func (c *conductor) Start() chan bool {
 	c.started = true
 
 	// start each ManagedService one at a time, this gives us service dependency order.
+SRV_LOOP:
 	for _, srv := range c.services {
 		c.log("Starting service: ", srv.name)
 		err := srv.service.Run(srv.ready, srv.stopped, srv.shutdown)
@@ -79,7 +80,7 @@ func (c *conductor) Start() chan bool {
 			// Service has timed out, shutdown everything
 			c.logf("Service timed-out during startup %s", srv.name)
 			c.Stop()
-			break
+			break SRV_LOOP
 		case <-srv.ready:
 			// Service started up ok!
 			c.log(srv.name, ".. ok")
@@ -107,20 +108,20 @@ func (c *conductor) Stop() {
 
 	// decrement our waitgroup when each service says it has stopped
 	for _, state := range c.services {
+		state.shutdown <- ctx
 		go func() {
 			<-state.stopped
 			wg.Done()
 		}()
-		state.shutdown <- ctx
 	}
 
 	// Wait for either all services to close, or the timeout to occur then signal shutdown.
 	select {
+	case <-done:
+		close(c.shutdown)
 	case <-time.After(c.stopTimeout):
 		c.log("Timeout exeeded waiting for services to stop, shutting down")
 		cancel()
-		close(c.shutdown)
-	case <-done:
 		close(c.shutdown)
 	}
 }
